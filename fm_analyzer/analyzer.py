@@ -373,9 +373,53 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     diagnostico = (f"PERDA EM: {onde_falhou} | {funil} | {local_simples}"
                    f" ({node_base}) | aging {aging_txt}{flag_extra}")
 
+    # ========================================================================
+    # CONCLUSAO (o que aconteceu) + TRATATIVA (acao necessaria)
+    # ========================================================================
+    aging_info = f" Aging: {aging_dias} dias desde a criacao." if aging_dias is not None else ""
+
+    if danificado:
+        dano_txt = ",".join(dano_codes) if dano_codes else "DAMAGE"
+        conclusao = f"Pacote DANIFICADO (evento {dano_txt}) em {node_base}.{aging_info}"
+        tratativa = "Encaminhar para Problem Solve. Avaliar descarte ou devolucao conforme politica de dano."
+    elif wrong_node_414:
+        conclusao = f"MIS-SORT: a transportadora enviou o pacote para o node ERRADO ({node_base}).{aging_info}"
+        tratativa = f"Acionar a transportadora para redirecionar do node {node_base} ao node correto de destino."
+    elif has_238:
+        conclusao = f"Pacote RE-SLAMM (re-etiquetado), normalmente originado de retorno/RTS. Atualmente em {node_base}.{aging_info}"
+        tratativa = "Verificar no historico o motivo do reslam e reprocessar conforme o novo destino."
+    elif not has_103:
+        conclusao = f"Pacote NUNCA foi coletado (sem evento 103).{aging_info}"
+        tratativa = "Acionar o DA/parceiro para realizar a coleta no seller."
+    elif etapa_receive.startswith("MISS"):
+        conclusao = f"Coletado, mas NAO RECEBIDO no prazo (sem 216 ate D+1 5:59). Parado na FM em {node_base}.{aging_info}"
+        tratativa = f"Localizar fisicamente no node {node_base} e bipar o RECEIVE (216) no Dolphin. Verificar o associado responsavel."
+    elif etapa_stow.startswith("MISS"):
+        conclusao = f"Recebido, mas NAO ESTUFADO no prazo (sem 201 ate D+1 5:59). Parado na FM em {node_base}.{aging_info}"
+        tratativa = f"Localizar no node {node_base} e realizar o STOW (201) no SSP."
+    elif etapa_depart.startswith("MISS"):
+        conclusao = f"Estufado, mas NAO DESPACHADO no prazo (sem 202 ate D+1 5:59). Retido em {node_base}.{aging_info}"
+        tratativa = f"Verificar shuttle/dispatch no node {node_base} e despachar (202) para o next mile."
+    elif has_301:
+        conclusao = f"Pacote ENTREGUE ao cliente (base {node_base}).{aging_info}"
+        if ced_missed or n_cpt_miss >= 1:
+            tratativa = "Entregue, porem com atraso de prazo (CED/CPT miss). Sem acao no pacote; analisar causa do atraso."
+        else:
+            tratativa = "Nenhuma acao necessaria - fluxo concluido com sucesso."
+    else:
+        conclusao = f"Pacote EM ANDAMENTO no fluxo, atualmente em {node_base}.{aging_info}"
+        tratativa = "Monitorar - sem falha de SLA ate o momento."
+
+    if backlog_3d:
+        conclusao += " [BACKLOG: parado 3+ dias sem chegar ao next mile]"
+    if ced_missed and not has_301:
+        conclusao += " [CED Missed: prazo de entrega estourado]"
+
     analise = diagnostico
 
     return {
+        "conclusao": conclusao,
+        "tratativa": tratativa,
         "diagnostico": diagnostico,
         "onde_falhou": onde_falhou,
         "categoria": categoria,

@@ -121,9 +121,9 @@ if uploaded is not None:
 
     # ---- Tabela objetiva (colunas principais primeiro) ----
     st.subheader("Analise por tracking ID")
-    cols_obj = ["tracking_id", "onde_falhou", "categoria", "aging_dias",
-                "etapa_pickup", "etapa_receive", "etapa_stow", "etapa_depart",
-                "local_simples", "origem", "destino", "diagnostico", "linha_do_tempo"]
+    cols_obj = ["tracking_id", "conclusao", "tratativa", "onde_falhou",
+                "categoria", "aging_dias", "etapa_receive", "etapa_stow",
+                "etapa_depart", "local_simples", "destino", "linha_do_tempo"]
     cols_obj = [c for c in cols_obj if c in resultado.columns]
     modo = st.radio("Exibir", ["Objetivo", "Completo"], horizontal=True)
     tabela = resultado[cols_obj] if modo == "Objetivo" else resultado
