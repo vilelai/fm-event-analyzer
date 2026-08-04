@@ -73,7 +73,7 @@ if uploaded is not None:
     c4.metric("Cancelados/RTO", resumo["cancelados"])
     c5, c6, c7, c8 = st.columns(4)
     c5.metric("Parados na FM", resumo["parados_na_fm"])
-    c6.metric("Em hub/middle", resumo["em_hub"])
+    c6.metric("Other mile", resumo["outras_milhas"])
     c7.metric("Danificados", resumo["danificados"])
     c8.metric("Entregues", resumo["entregues"])
     c9, c10, c11, c12 = st.columns(4)

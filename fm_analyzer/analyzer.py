@@ -83,13 +83,12 @@ _load_nodes_csv()
 
 
 def classify_node(node: str) -> str:
-    """Retorna 'FM', 'HUB' ou 'DOWNSTREAM' para um node."""
+    """Retorna 'FM' se o node esta na lista oficial de First Mile, senao 'OTHER_MILE'.
+    Qualquer node fora da lista FM e considerado outra milha (middle/last mile)."""
     node = str(node).strip().upper()
     if node in FM_NODES:
         return "FM"
-    if node in HUB_NODES:
-        return "HUB"
-    return "DOWNSTREAM"
+    return "OTHER_MILE"
 
 
 # ---------------------------------------------------------------------------
@@ -251,26 +250,22 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     # ---- LOCALIZACAO: onde o pacote esta / onde travou ----
     ultimo_node = destino
     tipo_ultimo = classify_node(ultimo_node) if ultimo_node else ""
-    passou_hub = any(classify_node(n) == "HUB" for n in nodes)
-    passou_downstream = any(classify_node(n) == "DOWNSTREAM" for n in nodes)
+    node_base = ultimo_node if ultimo_node else "?"
 
     if has_301:
-        localizacao = f"ENTREGUE ao cliente (last mile concluido){' - ' + ultimo_node if ultimo_node else ''}"
+        localizacao = f"ENTREGUE ao cliente (last mile concluido) - base: {node_base}"
     elif has_302:
-        localizacao = f"EM ROTA DE ENTREGA (last mile){' - ' + ultimo_node if ultimo_node else ''}"
+        localizacao = f"EM ROTA DE ENTREGA (last mile) - base: {node_base}"
     elif encerramento:
         localizacao = "ENCERRADO / BAIXA - saiu do fluxo (259)"
     elif tipo_ultimo == "FM":
         if has_202:
-            localizacao = f"PARADO NA MILHA DE FM (node {ultimo_node}) - despachado mas nao saiu"
+            localizacao = f"PARADO NA MILHA DE FM - base: {node_base} (despachado mas nao saiu)"
         else:
-            localizacao = f"PARADO NA MILHA DE FM (node {ultimo_node}) - SEM despacho (202)"
-    elif tipo_ultimo == "HUB":
-        localizacao = f"EM HUB / MIDDLE MILE (node {ultimo_node})"
-    elif tipo_ultimo == "DOWNSTREAM":
-        localizacao = f"Em node downstream / last mile (node {ultimo_node})"
+            localizacao = f"PARADO NA MILHA DE FM - base: {node_base} (SEM despacho 202)"
     else:
-        localizacao = "Indefinido (sem node identificado)"
+        # qualquer node fora da lista FM = outra milha
+        localizacao = f"OTHER MILE - base: {node_base}"
 
     if n_cpt_miss >= 1 and not has_301:
         localizacao += f" | ATRASADO ({n_cpt_miss}x CPT miss)"
@@ -360,7 +355,7 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "encerrados_baixa": int((resultado["categoria"].str.contains("ENCERRADO")).sum()),
         "danificados": int((resultado["danificado"] == "SIM").sum()),
         "parados_na_fm": int(resultado["localizacao_atual"].str.contains("MILHA DE FM").sum()),
-        "em_hub": int(resultado["localizacao_atual"].str.contains("HUB").sum()),
+        "outras_milhas": int(resultado["localizacao_atual"].str.contains("OTHER MILE").sum()),
         "entregues": int((resultado["entregue_301"] == "SIM").sum()),
     }
     return resultado, resumo
