@@ -72,10 +72,13 @@ if uploaded is not None:
     c3.metric("Re-slamm", resumo["reslamm"])
     c4.metric("Cancelados/RTO", resumo["cancelados"])
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("Perdidos", resumo["perdidos"])
-    c6.metric("Encerrados/baixa", resumo["encerrados_baixa"])
+    c5.metric("Parados na FM", resumo["parados_na_fm"])
+    c6.metric("Em hub/middle", resumo["em_hub"])
     c7.metric("Danificados", resumo["danificados"])
     c8.metric("Entregues", resumo["entregues"])
+    c9, c10, c11, c12 = st.columns(4)
+    c9.metric("Perdidos", resumo["perdidos"])
+    c10.metric("Encerrados/baixa", resumo["encerrados_baixa"])
 
     st.subheader("Distribuicao por categoria")
     cat = pd.DataFrame(

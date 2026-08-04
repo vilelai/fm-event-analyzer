@@ -42,6 +42,32 @@ def _codes(series) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Classificacao de nodes: First Mile vs Hub/Middle Mile vs downstream
+# (listas ajustaveis - baseadas no contexto FM Brasil)
+# ---------------------------------------------------------------------------
+FM_NODES = {
+    "ELP8", "ELP7", "ESA8", "ESP8", "EUA8", "ESG8", "EJU8", "ESC8", "EMBU", "ERJ1",
+    # estacoes de coleta/pickup (SPC/PN)
+    "SXPP", "PML9", "SBU9", "STU9", "SIO9", "PLS1", "SRP9", "SSC9", "SUU9",
+    "PJB2", "PMT2", "PFE1", "SFC9", "SOS9", "SSJ9", "SBT9",
+}
+HUB_NODES = {
+    "CGH7", "CGH3", "GIG7", "TBAV", "DBH5", "CNF7", "DPR2", "RIDQ", "TMOA",
+    "TRIO", "IXNN", "ZZEJ", "ZUTD", "YBN6", "PTOP", "MMIF",
+}
+
+
+def classify_node(node: str) -> str:
+    """Retorna 'FM', 'HUB' ou 'DOWNSTREAM' para um node."""
+    node = str(node).strip().upper()
+    if node in FM_NODES:
+        return "FM"
+    if node in HUB_NODES:
+        return "HUB"
+    return "DOWNSTREAM"
+
+
+# ---------------------------------------------------------------------------
 # Classificacao de um unico tracking
 # ---------------------------------------------------------------------------
 def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
@@ -197,6 +223,33 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     origem = nodes[0] if nodes else ""
     destino = nodes[-1] if nodes else ""
 
+    # ---- LOCALIZACAO: onde o pacote esta / onde travou ----
+    ultimo_node = destino
+    tipo_ultimo = classify_node(ultimo_node) if ultimo_node else ""
+    passou_hub = any(classify_node(n) == "HUB" for n in nodes)
+    passou_downstream = any(classify_node(n) == "DOWNSTREAM" for n in nodes)
+
+    if has_301:
+        localizacao = f"ENTREGUE ao cliente (last mile concluido){' - ' + ultimo_node if ultimo_node else ''}"
+    elif has_302:
+        localizacao = f"EM ROTA DE ENTREGA (last mile){' - ' + ultimo_node if ultimo_node else ''}"
+    elif encerramento:
+        localizacao = "ENCERRADO / BAIXA - saiu do fluxo (259)"
+    elif tipo_ultimo == "FM":
+        if has_202:
+            localizacao = f"PARADO NA MILHA DE FM (node {ultimo_node}) - despachado mas nao saiu"
+        else:
+            localizacao = f"PARADO NA MILHA DE FM (node {ultimo_node}) - SEM despacho (202)"
+    elif tipo_ultimo == "HUB":
+        localizacao = f"EM HUB / MIDDLE MILE (node {ultimo_node})"
+    elif tipo_ultimo == "DOWNSTREAM":
+        localizacao = f"Em node downstream / last mile (node {ultimo_node})"
+    else:
+        localizacao = "Indefinido (sem node identificado)"
+
+    if n_cpt_miss >= 1 and not has_301:
+        localizacao += f" | ATRASADO ({n_cpt_miss}x CPT miss)"
+
     # ---- linha do tempo legivel (so os marcos que existem) ----
     marcos_def = [
         ("Label(503)", "503"), ("Coleta(103)", "103"), ("Receive(216)", "216"),
@@ -210,13 +263,14 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     linha = [f"{nome}: {marco(code)}" for nome, code in marcos_def if code in codes]
     linha_do_tempo = " | ".join(linha)
 
-    analise = categoria
+    analise = f"{categoria} | LOCAL: {localizacao}"
     if flags:
         analise += " | " + "; ".join(flags)
     analise += f" || Rota: {rota}"
 
     return {
         "categoria": categoria,
+        "localizacao_atual": localizacao,
         "origem": origem,
         "destino": destino,
         "rota": rota,
@@ -280,6 +334,8 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "orfaos": int((resultado["categoria"].str.startswith("ORFAO")).sum()),
         "encerrados_baixa": int((resultado["categoria"].str.contains("ENCERRADO")).sum()),
         "danificados": int((resultado["danificado"] == "SIM").sum()),
+        "parados_na_fm": int(resultado["localizacao_atual"].str.contains("MILHA DE FM").sum()),
+        "em_hub": int(resultado["localizacao_atual"].str.contains("HUB").sum()),
         "entregues": int((resultado["entregue_301"] == "SIM").sum()),
     }
     return resultado, resumo
