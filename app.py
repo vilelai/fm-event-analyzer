@@ -66,12 +66,16 @@ if uploaded is not None:
 
     # ---- Metricas ----
     st.subheader("Resumo")
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Tracking IDs", resumo["total_tracking_ids"])
     c2.metric("Gap recebimento", resumo["gap_recebimento"])
     c3.metric("Re-slamm", resumo["reslamm"])
     c4.metric("Cancelados/RTO", resumo["cancelados"])
+    c5, c6, c7, c8 = st.columns(4)
     c5.metric("Perdidos", resumo["perdidos"])
+    c6.metric("Encerrados/baixa", resumo["encerrados_baixa"])
+    c7.metric("Danificados", resumo["danificados"])
+    c8.metric("Entregues", resumo["entregues"])
 
     st.subheader("Distribuicao por categoria")
     cat = pd.DataFrame(

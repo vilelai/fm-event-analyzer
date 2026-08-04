@@ -62,21 +62,55 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         sub = [str(x) for x in sub if pd.notna(x) and str(x).strip() not in ("", "nan")]
         return sub[0] if sub else ""
 
+    # --- helper: primeiro registro de um evento como "NODE dd/mm HH:MM" ---
+    date_col = cols.get("status_date")
+    node_col = cols.get("status_node_id")
+
+    def marco(code: str) -> str:
+        sub = g[g[cols["status_event"]] == "EVENT_" + code]
+        if len(sub) == 0:
+            return ""
+        row = sub.iloc[0]
+        node = str(row[node_col]) if node_col and pd.notna(row[node_col]) else ""
+        node = "" if node in ("nan", "None") else node
+        dt = ""
+        if date_col and pd.notna(row[date_col]):
+            try:
+                dt = pd.to_datetime(row[date_col]).strftime("%d/%m %H:%M")
+            except Exception:  # noqa: BLE001
+                dt = str(row[date_col])
+        partes = [p for p in (node, dt) if p]
+        return " ".join(partes) if partes else "sim"
+
+    # --- reasons que indicam pacote danificado (heuristica, ajustavel) ---
+    DAMAGE_REASONS = {"DM", "DA", "DG", "DMG", "DZ"}
+    reasons_all = set()
+    if cols.get("reason"):
+        reasons_all = {str(x).strip().upper() for x in g[cols["reason"]].tolist()
+                       if pd.notna(x) and str(x).strip() not in ("", "nan")}
+    danificado = bool(reasons_all & DAMAGE_REASONS)
+
     first_201 = next((i for i, c in enumerate(codes) if c == "201"), None)
 
+    # --- marcos operacionais ---
+    has_503 = "503" in codes
     has_103 = "103" in codes
     n_216 = codes.count("216")
-    has_201 = "201" in codes
+    n_201 = codes.count("201")
+    has_201 = n_201 >= 1
     has_202 = "202" in codes
+    n_checkin = codes.count("253")
+    n_checkout = codes.count("254")
     has_104 = "104" in codes
     has_238 = "238" in codes
     has_301 = "301" in codes
+    has_302 = "302" in codes
     has_228 = "228" in codes
-    n_201 = codes.count("201")
     n_cpt_miss = codes.count("661")
     n_cpt_warn = codes.count("660")
     encerramento = "259" in codes
     tem_423 = "423" in codes
+    excecao = any(c in ("370", "404", "636", "651", "699") for c in codes)
 
     late_reinject = any(
         c in ("101", "503") and first_201 is not None and i > first_201
@@ -113,19 +147,28 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     elif n_216 >= 1 and has_104:
         categoria = "RECEBIDO porem CANCELADO/RTO"
         flags.append(f"104 reason {reason_of('104')}")
+    elif n_216 >= 1 and has_201 and has_202 and has_301:
+        categoria = "RECEBIDO - fluxo normal (entregue)"
     elif n_216 >= 1 and has_201 and has_202:
-        categoria = "RECEBIDO - fluxo normal"
+        categoria = "RECEBIDO - fluxo normal (em transito)"
+    elif n_216 >= 1 and has_201 and not has_202:
+        categoria = "RECEBIDO + stow, SEM despacho (202)"
     elif n_216 >= 1:
-        categoria = "RECEBIDO - parcial"
+        categoria = "RECEBIDO - parcial (sem stow)"
     else:
         categoria = "INDEFINIDO (verificar eventos)"
 
+    # ---- flags adicionais ----
+    if danificado:
+        flags.append(f"DANIFICADO (reason {','.join(sorted(reasons_all & DAMAGE_REASONS))})")
     if tem_423 and "423" not in "".join(flags):
         flags.append("evento 423 (cancel/excecao)")
     if has_228:
         flags.append("cross-dock (XD)")
     if n_cpt_miss >= 1:
         flags.append(f"CPT miss {n_cpt_miss}x (661)")
+    if excecao:
+        flags.append("evento de excecao/hold")
     if has_301:
         flags.append("entregue (301)")
     if encerramento:
@@ -135,28 +178,44 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     origem = nodes[0] if nodes else ""
     destino = nodes[-1] if nodes else ""
 
+    # ---- linha do tempo legivel (so os marcos que existem) ----
+    marcos_def = [
+        ("Label(503)", "503"), ("Coleta(103)", "103"), ("Receive(216)", "216"),
+        ("Stow(201)", "201"), ("Check-in(253)", "253"), ("Check-out(254)", "254"),
+        ("Dispatch(202)", "202"), ("Redirect/XD(228)", "228"), ("OFD(302)", "302"),
+        ("Entregue(301)", "301"), ("Cancel(104)", "104"), ("Re-slamm(238)", "238"),
+        ("Excecao(423)", "423"), ("Baixa(259)", "259"),
+    ]
+    linha = [f"{nome}: {marco(code)}" for nome, code in marcos_def if code in codes]
+    linha_do_tempo = " | ".join(linha)
+
     analise = categoria
     if flags:
         analise += " | " + "; ".join(flags)
-    analise += (f" || 216x{n_216} 103:{'S' if has_103 else 'N'}"
-                f" 201:{'S' if has_201 else 'N'} 202:{'S' if has_202 else 'N'}"
-                f" | Rota: {rota}")
+    analise += f" || Rota: {rota}"
 
     return {
         "categoria": categoria,
         "origem": origem,
         "destino": destino,
         "rota": rota,
-        "tem_coleta_103": has_103,
-        "qtd_receive_216": n_216,
-        "tem_stow_201": has_201,
-        "tem_dispatch_202": has_202,
-        "cancelado_104": has_104,
-        "reslamm_238": has_238,
-        "cpt_miss_661": n_cpt_miss,
+        "coleta_103": marco("103") or "NAO",
+        "receive_216": n_216,
+        "stow_201": n_201,
+        "checkin_veiculo_253": n_checkin,
+        "checkout_veiculo_254": n_checkout,
+        "dispatch_202": "SIM" if has_202 else "NAO",
+        "cross_dock_228": "SIM" if has_228 else "NAO",
+        "cancelado_104": "SIM" if has_104 else "NAO",
+        "reslamm_238": "SIM" if has_238 else "NAO",
+        "danificado": "SIM" if danificado else "NAO",
         "cpt_warn_660": n_cpt_warn,
-        "entregue_301": has_301,
+        "cpt_miss_661": n_cpt_miss,
+        "ofd_302": "SIM" if has_302 else "NAO",
+        "entregue_301": "SIM" if has_301 else "NAO",
+        "encerrado_259": "SIM" if encerramento else "NAO",
         "flags": "; ".join(flags),
+        "linha_do_tempo": linha_do_tempo,
         "sequencia_eventos": "-".join(codes),
         "analise": analise,
     }
@@ -199,6 +258,7 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "perdidos": int((resultado["categoria"].str.contains("PERDIDO")).sum()),
         "orfaos": int((resultado["categoria"].str.startswith("ORFAO")).sum()),
         "encerrados_baixa": int((resultado["categoria"].str.contains("ENCERRADO")).sum()),
-        "entregues": int(resultado["entregue_301"].sum()),
+        "danificados": int((resultado["danificado"] == "SIM").sum()),
+        "entregues": int((resultado["entregue_301"] == "SIM").sum()),
     }
     return resultado, resumo
