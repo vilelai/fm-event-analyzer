@@ -1,41 +1,62 @@
 node,tipo,regional,cidade
-ELP8,FM,SP CAP,Embu das Artes
-ELP7,FM,SP INT,Campinas
-ESA8,FM,SP CAP,Osasco
-ESP8,FM,SP CAP,Guarulhos
-EUA8,FM,SP CAP,Sao Bernardo do Campo
-ESG8,FM,SP CAP,
-EJU8,FM,SP CAP,
-ESC8,FM,,
-EMBU,FM,RIMES-NE,
-ERJ1,FM,RIMES-NE,
-SXPP,FM,,
-PML9,FM,,
-SBU9,FM,,
-STU9,FM,,
-SIO9,FM,,
-PLS1,FM,SP INT,Lins
-SRP9,FM,,
-SSC9,FM,,
-SUU9,FM,,
-SFC9,FM,,
-SOS9,FM,,
-SSJ9,FM,,
-SBT9,FM,,
-PJB2,PN,,
-PMT2,PN,,
-PFE1,PN,,
-DTL9,PN,,
-DUU8,PN,,
-XMX5,PN,,
-DPB8,PN,,
-DXX9,SPC,,
-DMX9,SPC,,
-DGD8,SPC,,
-DMT7,SPC,,
-DQR8,SPC,,
+ESB8,SPC,DF-SUL,Brasilia
+EVT8,PN,RIMES-NE,Vitoria
+EGO8,SPC,DF-SUL,Goiania
+EJF8,PN,RIMES-NE,Juiz de Fora
+EMG8,SPC,RIMES-NE,Contagem
+EPL8,PN,RIMES-NE,Divinopolis
+EUB8,PN,RIMES-NE,Uberlandia
+EPE8,SPC,RIMES-NE,Recife
+ECB8,SPC,DF-SUL,Curitiba
+ELO8,SPC,DF-SUL,Londrina
+EMR8,PN,DF-SUL,Maringa
+EOZ8,PN,DF-SUL,Foz do Iguacu
+EVE8,PN,DF-SUL,Cascavel
+ENF8,PN,RIMES-NE,Nova Friburgo
+EQU8,PN,RIMES-NE,Duque de Caxias
+ERJ1,SPC,RIMES-NE,Rio de Janeiro
+ERJ9,PN,RIMES-NE,Rio de Janeiro
+ESG8,PN,RIMES-NE,Sao Goncalo
+ERS8,SPC,DF-SUL,Porto Alegre
+EIJ8,PN,DF-SUL,Itajai
+EJO8,PN,DF-SUL,Joinville
+EME8,PN,DF-SUL,Blumenau
+ESE8,SPC,DF-SUL,Florianopolis
+EUM8,PN,DF-SUL,Criciuma
+EIO8,PN,SP INT,Ourinhos
+ELN8,PN,SP INT,Lins
+ELP3,PN,SP INT,Mogi das Cruzes
+ELP4,PN,SP CAP,Brasilandia
+ELP6,PN,SP CAP,Sao Matheus
+ELP7,SPC,SP INT,Campinas
+ELP8,SPC,SP CAP,Embu das Artes
+ELT8,PN,SP INT,Braganca Paulista
+EML8,PN,SP INT,Marilia
+ENC8,PN,SP INT,Franca
+EOG8,PN,SP INT,Araras
+EOS8,PN,SP INT,Barretos
+EPF8,PN,SP INT,Porto Ferreira
+EPP8,SPC,SP INT,Presidente Prudente
+ERN8,PN,SP INT,Fernandopolis
+ERP8,SPC,SP INT,Ribeirao Preto
+ESA8,SPC,SP CAP,Osasco
+ESC8,PN,SP INT,Sao Carlos (deprecada)
+ESJ8,SPC,SP INT,Sao Jose do Rio Preto
+ESP2,PN,SP CAP,Capao Redondo
+ESP5,PN,SP INT,Sorocaba
+ESP6,PN,SP INT,Taubate
+ESP7,PN,SP INT,S.J. dos Campos
+ESP8,SPC,SP CAP,Guarulhos
+ESP9,PN,SP INT,Piracicaba
+ESV8,PN,SP INT,Santos
+ETB8,PN,SP INT,Aracatuba
+ETU8,PN,SP INT,Botucatu
+EUA8,PN,SP CAP,Sao Bernardo do Campo
+EUI8,PN,SP INT,Tatui
+EUN8,PN,SP INT,Jaguariuna (deprecada)
+EUR8,SPC,SP INT,Bauru
 CGH7,HUB,SP CAP,Cajamar
-CGH3,HUB,,
+CGH3,HUB,SP CAP,
 GIG7,HUB,RJ,Sao Joao de Meriti
 TBAV,HUB,,
 DBH5,HUB,,

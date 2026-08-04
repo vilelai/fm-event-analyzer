@@ -45,15 +45,10 @@ def _codes(series) -> list:
 # Classificacao de nodes: First Mile vs Hub/Middle Mile vs downstream
 # (listas ajustaveis - baseadas no contexto FM Brasil)
 # ---------------------------------------------------------------------------
+# Fallback minimo (a lista completa e autoritativa vem de nodes.csv).
+# Todos os nodes FM oficiais tem prefixo "E" (SPC = Seller Pickup Center, PN = Partner Node).
 FM_NODES = {
-    # estacoes FM principais / sort
-    "ELP8", "ELP7", "ESA8", "ESP8", "EUA8", "ESG8", "EJU8", "ESC8", "EMBU", "ERJ1",
-    # estacoes de coleta (SPC - Seller Pickup Center)
-    "SXPP", "PML9", "SBU9", "STU9", "SIO9", "PLS1", "SRP9", "SSC9", "SUU9",
-    "SFC9", "SOS9", "SSJ9", "SBT9",
-    "DXX9", "DMX9", "DGD8", "DMT7", "DQR8",
-    # partner nodes (PN)
-    "PJB2", "PMT2", "PFE1", "DTL9", "DUU8", "XMX5", "DPB8",
+    "ELP8", "ELP7", "ESA8", "ESP8", "EUA8", "ESG8", "ESC8", "ERJ1",
 }
 HUB_NODES = {
     "CGH7", "CGH3", "GIG7", "TBAV", "DBH5", "CNF7", "DPR2", "RIDQ", "TMOA",
