@@ -76,6 +76,7 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     n_cpt_miss = codes.count("661")
     n_cpt_warn = codes.count("660")
     encerramento = "259" in codes
+    tem_423 = "423" in codes
 
     late_reinject = any(
         c in ("101", "503") and first_201 is not None and i > first_201
@@ -86,13 +87,21 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     categoria = ""
     flags = []
 
-    if has_238:
+    if encerramento and not has_301:
+        categoria = "ENCERRADO / BAIXA (259)"
+        if tem_423:
+            flags.append("cancelamento/excecao (423) antes da baixa")
+        if has_103 and n_216 == 0:
+            flags.append("coletado mas nunca recebido - baixa pos-coleta")
+        if n_cpt_miss >= 1:
+            flags.append(f"ficou travado ({n_cpt_miss}x CPT miss) antes da baixa")
+    elif has_238:
         categoria = "RE-SLAMM"
         if late_reinject:
             flags.append("FORCADO (reinjecao SPS pos-stow)")
         if n_201 >= 5:
             flags.append(f"stow repetido {n_201}x (manipulacao)")
-    elif has_103 and n_216 == 0 and not has_201 and not has_301 and (n_cpt_miss >= 1 or encerramento):
+    elif has_103 and n_216 == 0 and not has_201 and not has_301 and n_cpt_miss >= 1:
         categoria = "PACOTE PERDIDO / TRAVADO"
         flags.append("coletado mas nunca recebido/estufado")
     elif has_103 and n_216 == 0:
@@ -111,6 +120,8 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     else:
         categoria = "INDEFINIDO (verificar eventos)"
 
+    if tem_423 and "423" not in "".join(flags):
+        flags.append("evento 423 (cancel/excecao)")
     if has_228:
         flags.append("cross-dock (XD)")
     if n_cpt_miss >= 1:
@@ -187,6 +198,7 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "cancelados": int((resultado["categoria"].str.contains("CANCELADO")).sum()),
         "perdidos": int((resultado["categoria"].str.contains("PERDIDO")).sum()),
         "orfaos": int((resultado["categoria"].str.startswith("ORFAO")).sum()),
+        "encerrados_baixa": int((resultado["categoria"].str.contains("ENCERRADO")).sum()),
         "entregues": int(resultado["entregue_301"].sum()),
     }
     return resultado, resumo
