@@ -406,8 +406,11 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
             tratativa = "Entregue, porem com atraso de prazo (CED/CPT miss). Sem acao no pacote; analisar causa do atraso."
         else:
             tratativa = "Nenhuma acao necessaria - fluxo concluido com sucesso."
+    elif tipo_ultimo == "OTHER_MILE":
+        conclusao = f"Pacote saiu da First Mile e esta em OUTRA MILHA (base {node_base}).{aging_info}"
+        tratativa = "Sem acao de First Mile - pacote ja em outra milha. Acompanhar com a milha responsavel."
     else:
-        conclusao = f"Pacote EM ANDAMENTO no fluxo, atualmente em {node_base}.{aging_info}"
+        conclusao = f"Pacote EM ANDAMENTO no fluxo FM, atualmente em {node_base}.{aging_info}"
         tratativa = "Monitorar - sem falha de SLA ate o momento."
 
     if backlog_3d:

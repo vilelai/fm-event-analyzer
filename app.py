@@ -121,12 +121,20 @@ if uploaded is not None:
 
     # ---- Tabela objetiva (colunas principais primeiro) ----
     st.subheader("Analise por tracking ID")
-    cols_obj = ["tracking_id", "conclusao", "tratativa", "onde_falhou",
-                "categoria", "aging_dias", "etapa_receive", "etapa_stow",
-                "etapa_depart", "local_simples", "destino", "linha_do_tempo"]
+    cols_obj = ["tracking_id", "aging_dias", "localizacao_atual",
+                "conclusao", "tratativa"]
     cols_obj = [c for c in cols_obj if c in resultado.columns]
     modo = st.radio("Exibir", ["Objetivo", "Completo"], horizontal=True)
-    tabela = resultado[cols_obj] if modo == "Objetivo" else resultado
+    if modo == "Objetivo":
+        tabela = resultado[cols_obj].rename(columns={
+            "tracking_id": "Tracking ID",
+            "aging_dias": "Aging (dias)",
+            "localizacao_atual": "Local atual",
+            "conclusao": "Problema / O que aconteceu",
+            "tratativa": "Tratativa",
+        })
+    else:
+        tabela = resultado
     st.dataframe(tabela, hide_index=True, use_container_width=True)
 
     # ---- Download ----
