@@ -82,13 +82,26 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         partes = [p for p in (node, dt) if p]
         return " ".join(partes) if partes else "sim"
 
-    # --- reasons que indicam pacote danificado (heuristica, ajustavel) ---
-    DAMAGE_REASONS = {"DM", "DA", "DG", "DMG", "DZ"}
-    reasons_all = set()
-    if cols.get("reason"):
-        reasons_all = {str(x).strip().upper() for x in g[cols["reason"]].tolist()
-                       if pd.notna(x) and str(x).strip() not in ("", "nan")}
-    danificado = bool(reasons_all & DAMAGE_REASONS)
+    # --- DANO: detectado por EVENT codes de dano (oficial) ou shiptrack_event=DAMAGE ---
+    # Codigos de dano dedicados (sempre indicam dano):
+    DAMAGE_EVENTS_STRONG = {"407", "408", "423", "432", "485"}
+    # Codigos que so significam dano no contexto DAMAGE (uso duplo): 108, 301, 416
+    DAMAGE_EVENTS_CONTEXT = {"108", "301", "416"}
+
+    codes_set = set(codes)
+    dano_codes = sorted(codes_set & DAMAGE_EVENTS_STRONG)
+
+    # coluna shiptrack_event (2a coluna do export) confirma dano
+    shiptrack_damage = False
+    if "shiptrack_event" in {str(c).strip().lower() for c in g.columns}:
+        st_col = [c for c in g.columns if str(c).strip().lower() == "shiptrack_event"][0]
+        vals = {str(x).strip().upper() for x in g[st_col].tolist()
+                if pd.notna(x) and str(x).strip() not in ("", "nan")}
+        shiptrack_damage = "DAMAGE" in vals
+        if shiptrack_damage:
+            dano_codes += sorted(codes_set & DAMAGE_EVENTS_CONTEXT)
+
+    danificado = bool(dano_codes) or shiptrack_damage
 
     first_201 = next((i for i, c in enumerate(codes) if c == "201"), None)
 
@@ -121,10 +134,18 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     categoria = ""
     flags = []
 
-    if encerramento and not has_301:
+    if danificado:
+        categoria = "PACOTE DANIFICADO"
+        if dano_codes:
+            flags.append(f"eventos de dano: {','.join(dano_codes)}")
+        if encerramento:
+            flags.append("baixado apos dano (259)")
+        if has_301:
+            flags.append("entregue danificado (301)")
+    elif encerramento and not has_301:
         categoria = "ENCERRADO / BAIXA (259)"
         if tem_423:
-            flags.append("cancelamento/excecao (423) antes da baixa")
+            flags.append("dano (423) antes da baixa")
         if has_103 and n_216 == 0:
             flags.append("coletado mas nunca recebido - baixa pos-coleta")
         if n_cpt_miss >= 1:
@@ -159,10 +180,8 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         categoria = "INDEFINIDO (verificar eventos)"
 
     # ---- flags adicionais ----
-    if danificado:
-        flags.append(f"DANIFICADO (reason {','.join(sorted(reasons_all & DAMAGE_REASONS))})")
-    if tem_423 and "423" not in "".join(flags):
-        flags.append("evento 423 (cancel/excecao)")
+    if danificado and "dano" not in "".join(flags):
+        flags.append(f"DANIFICADO ({','.join(dano_codes) if dano_codes else 'shiptrack=DAMAGE'})")
     if has_228:
         flags.append("cross-dock (XD)")
     if n_cpt_miss >= 1:
@@ -184,7 +203,9 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         ("Stow(201)", "201"), ("Check-in(253)", "253"), ("Check-out(254)", "254"),
         ("Dispatch(202)", "202"), ("Redirect/XD(228)", "228"), ("OFD(302)", "302"),
         ("Entregue(301)", "301"), ("Cancel(104)", "104"), ("Re-slamm(238)", "238"),
-        ("Excecao(423)", "423"), ("Baixa(259)", "259"),
+        ("Dano(423)", "423"), ("Dano(408)", "408"), ("Dano(416)", "416"),
+        ("Dano(432)", "432"), ("Dano(485)", "485"), ("Dano(407)", "407"),
+        ("PickupFail-dano(108)", "108"), ("Baixa(259)", "259"),
     ]
     linha = [f"{nome}: {marco(code)}" for nome, code in marcos_def if code in codes]
     linha_do_tempo = " | ".join(linha)
