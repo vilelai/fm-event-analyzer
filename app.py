@@ -78,7 +78,7 @@ if uploaded is not None:
     c8.metric("Entregues", resumo["entregues"])
     c9, c10, c11, c12 = st.columns(4)
     c9.metric("Perdidos", resumo["perdidos"])
-    c10.metric("Encerrados/baixa", resumo["encerrados_baixa"])
+    c10.metric("CED Missed", resumo["ced_missed"])
 
     # ---- Tabela dinamica ----
     st.subheader("Tabela dinamica")

@@ -171,7 +171,7 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     has_228 = "228" in codes
     n_cpt_miss = codes.count("661")
     n_cpt_warn = codes.count("660")
-    encerramento = "259" in codes
+    ced_missed = "259" in codes  # EVENT_259 = CED Missed (estourou prazo de entrega)
     tem_423 = "423" in codes
     excecao = any(c in ("370", "404", "636", "651", "699") for c in codes)
 
@@ -188,18 +188,8 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         categoria = "PACOTE DANIFICADO"
         if dano_codes:
             flags.append(f"eventos de dano: {','.join(dano_codes)}")
-        if encerramento:
-            flags.append("baixado apos dano (259)")
         if has_301:
             flags.append("entregue danificado (301)")
-    elif encerramento and not has_301:
-        categoria = "ENCERRADO / BAIXA (259)"
-        if tem_423:
-            flags.append("dano (423) antes da baixa")
-        if has_103 and n_216 == 0:
-            flags.append("coletado mas nunca recebido - baixa pos-coleta")
-        if n_cpt_miss >= 1:
-            flags.append(f"ficou travado ({n_cpt_miss}x CPT miss) antes da baixa")
     elif has_238:
         categoria = "RE-SLAMM"
         if late_reinject:
@@ -240,8 +230,8 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         flags.append("evento de excecao/hold")
     if has_301:
         flags.append("entregue (301)")
-    if encerramento:
-        flags.append("encerrado/baixa (259)")
+    if ced_missed:
+        flags.append("CED Missed (259) - estourou prazo de entrega")
 
     rota = ">".join(dict.fromkeys(nodes)) if nodes else "-"
     origem = nodes[0] if nodes else ""
@@ -256,8 +246,6 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         localizacao = f"ENTREGUE ao cliente (last mile concluido) - base: {node_base}"
     elif has_302:
         localizacao = f"EM ROTA DE ENTREGA (last mile) - base: {node_base}"
-    elif encerramento:
-        localizacao = "ENCERRADO / BAIXA - saiu do fluxo (259)"
     elif tipo_ultimo == "FM":
         if has_202:
             localizacao = f"PARADO NA MILHA DE FM - base: {node_base} (despachado mas nao saiu)"
@@ -279,8 +267,6 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         local_simples = "ENTREGUE"
     elif "ROTA DE ENTREGA" in localizacao:
         local_simples = "EM ROTA (last mile)"
-    elif "BAIXA" in localizacao:
-        local_simples = "BAIXA/ENCERRADO"
     else:
         local_simples = "OUTRO"
 
@@ -328,7 +314,7 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         "cpt_miss_661": n_cpt_miss,
         "ofd_302": "SIM" if has_302 else "NAO",
         "entregue_301": "SIM" if has_301 else "NAO",
-        "encerrado_259": "SIM" if encerramento else "NAO",
+        "ced_missed_259": "SIM" if ced_missed else "NAO",
         "flags": "; ".join(flags),
         "linha_do_tempo": linha_do_tempo,
         "sequencia_eventos": "-".join(codes),
@@ -372,7 +358,7 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "cancelados": int((resultado["categoria"].str.contains("CANCELADO")).sum()),
         "perdidos": int((resultado["categoria"].str.contains("PERDIDO")).sum()),
         "orfaos": int((resultado["categoria"].str.startswith("ORFAO")).sum()),
-        "encerrados_baixa": int((resultado["categoria"].str.contains("ENCERRADO")).sum()),
+        "ced_missed": int((resultado["ced_missed_259"] == "SIM").sum()),
         "danificados": int((resultado["danificado"] == "SIM").sum()),
         "parados_na_fm": int(resultado["localizacao_atual"].str.contains("MILHA DE FM").sum()),
         "outras_milhas": int(resultado["localizacao_atual"].str.contains("OTHER MILE").sum()),

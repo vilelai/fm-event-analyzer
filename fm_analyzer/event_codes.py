@@ -21,7 +21,7 @@ EVENT_CODES = {
     "241": {"nome": "Movimentacao (stow)", "desc": "Evento de movimentacao ligado a stow.", "confirmed": False},
     "253": {"nome": "Check-in de veiculo/container", "desc": "Chegada/check-in de container (trailer) no node.", "confirmed": True},
     "254": {"nome": "Check-out de veiculo/container", "desc": "Carregamento/check-out do container (saida do veiculo).", "confirmed": True},
-    "259": {"nome": "Encerramento / baixa (terminal)", "desc": "Evento terminal - pacote sai do fluxo (baixa/perda/cancelamento). Sender TCPS. Confirmado em 2 casos.", "confirmed": True},
+    "259": {"nome": "CED Missed", "desc": "Estourou o prazo de entrega (CED = Committed/Customer Estimated Delivery). Miss de SLA de entrega, NAO e baixa do pacote.", "confirmed": True},
     "301": {"nome": "Delivered", "desc": "Entregue ao cliente. Variante DAMAGE = entregue porem danificado (checar shiptrack_event).", "confirmed": True},
     "302": {"nome": "Out for Delivery", "desc": "Saiu para entrega (OFD).", "confirmed": True},
     "370": {"nome": "Excecao / Hold", "desc": "Pacote em excecao/espera (OI/UN).", "confirmed": False},
