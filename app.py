@@ -28,6 +28,23 @@ with st.sidebar:
         "3. Veja a analise e baixe o resultado."
     )
     st.divider()
+    with st.expander("📐 Conceitos e SLA (premissas FM)"):
+        st.markdown(
+            "**Funil sequencial** (a perda e a 1a etapa que falha):\n\n"
+            "1. **Pickup** — recebeu 103 (coleta)\n"
+            "2. **Receive success** — 216 ate **D+1 5:59am** do 103, senao MISS\n"
+            "3. **Stow success** — 201 ate **D+1 5:59am** do 216, senao MISS\n"
+            "4. **Depart success** — 202 ate **D+1 5:59am** da data-ref do 201 "
+            "(regra D-1/D0: 201 entre 0:00-5:59 conta D-1), senao MISS\n\n"
+            "**Outros conceitos:**\n"
+            "- **Aging** — dias desde o nascimento (503) ate o ultimo evento\n"
+            "- **Backlog 3+ dias** — 103 parado 3+ dias sem chegar next mile\n"
+            "- **Wrong node (414)** — mis-sort na rede da transportadora\n"
+            "- **Re-slamm (238)** — re-etiquetagem\n"
+            "- **CED Missed (259)** — estouro do prazo de entrega\n\n"
+            "**Eventos:** 103 pickup | 216 arrival/receive | 201 stow/processed | "
+            "202 departure | 414 wrong node"
+        )
     with st.expander("📖 Base de event codes"):
         kb = pd.DataFrame([
             {"Evento": k, "Nome": v["nome"], "Confirmado": "Sim" if v["confirmed"] else "A confirmar"}
