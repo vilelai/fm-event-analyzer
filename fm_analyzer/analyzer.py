@@ -46,15 +46,45 @@ def _codes(series) -> list:
 # (listas ajustaveis - baseadas no contexto FM Brasil)
 # ---------------------------------------------------------------------------
 FM_NODES = {
+    # estacoes FM principais / sort
     "ELP8", "ELP7", "ESA8", "ESP8", "EUA8", "ESG8", "EJU8", "ESC8", "EMBU", "ERJ1",
-    # estacoes de coleta/pickup (SPC/PN)
+    # estacoes de coleta (SPC - Seller Pickup Center)
     "SXPP", "PML9", "SBU9", "STU9", "SIO9", "PLS1", "SRP9", "SSC9", "SUU9",
-    "PJB2", "PMT2", "PFE1", "SFC9", "SOS9", "SSJ9", "SBT9",
+    "SFC9", "SOS9", "SSJ9", "SBT9",
+    "DXX9", "DMX9", "DGD8", "DMT7", "DQR8",
+    # partner nodes (PN)
+    "PJB2", "PMT2", "PFE1", "DTL9", "DUU8", "XMX5", "DPB8",
 }
 HUB_NODES = {
     "CGH7", "CGH3", "GIG7", "TBAV", "DBH5", "CNF7", "DPR2", "RIDQ", "TMOA",
     "TRIO", "IXNN", "ZZEJ", "ZUTD", "YBN6", "PTOP", "MMIF",
 }
+
+
+# Carrega/mescla nodes de um CSV externo (fm_analyzer/nodes.csv) se existir.
+# Colunas: node,tipo(,regional,cidade). tipo FM/PN/SPC -> First Mile; HUB -> hub.
+def _load_nodes_csv():
+    import csv
+    import os
+    path = os.path.join(os.path.dirname(__file__), "nodes.csv")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                node = str(row.get("node", "")).strip().upper()
+                tipo = str(row.get("tipo", "")).strip().upper()
+                if not node:
+                    continue
+                if tipo in ("FM", "PN", "SPC", "SORT"):
+                    FM_NODES.add(node)
+                elif tipo == "HUB":
+                    HUB_NODES.add(node)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+_load_nodes_csv()
 
 
 def classify_node(node: str) -> str:

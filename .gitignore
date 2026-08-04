@@ -11,6 +11,7 @@ env/
 *.xls
 *.csv
 !sample_events.csv
+!fm_analyzer/nodes.csv
 
 # IDE / OS
 .vscode/
