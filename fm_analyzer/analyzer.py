@@ -180,58 +180,136 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         for i, c in enumerate(codes)
     )
 
-    # ---- Regra de classificacao (ordem de prioridade) ----
-    categoria = ""
-    flags = []
+    # ========================================================================
+    # DATAS e SLA (premissas oficiais FM) - funil Pickup>Receive>Stow>Depart
+    # ========================================================================
+    def dt_of(code: str):
+        sub = g[g[cols["status_event"]] == "EVENT_" + code]
+        if len(sub) == 0 or not date_col:
+            return None
+        v = pd.to_datetime(sub.iloc[0][date_col], errors="coerce")
+        return v if pd.notna(v) else None
 
+    dts_all = (pd.to_datetime(g[date_col], errors="coerce").dropna()
+               if date_col else pd.Series([], dtype="datetime64[ns]"))
+    ultima_dt = dts_all.max() if len(dts_all) else None
+    dt_503 = dt_of("503")
+    dt_103 = dt_of("103")
+    dt_216 = dt_of("216")
+    dt_201 = dt_of("201")
+    dt_202 = dt_of("202")
+
+    def deadline_dplus1(ref_dt):
+        # D+1 05:59am a partir da DATA de referencia
+        return ref_dt.normalize() + pd.Timedelta(days=1, hours=5, minutes=59, seconds=59)
+
+    # AGING: dias desde o nascimento (503) ate o ultimo evento
+    base_aging = dt_503 or dt_103 or (dts_all.min() if len(dts_all) else None)
+    aging_dias = (int((ultima_dt - base_aging).days)
+                  if (base_aging is not None and ultima_dt is not None) else None)
+
+    # ETAPA 1 - Pickup: recebeu 103?
+    etapa_pickup = "OK" if has_103 else "SEM 103"
+
+    # ETAPA 2 - Receive success: 216 ate D+1 5:59 do 103
+    if not has_103:
+        etapa_receive = "NA"
+    elif n_216 == 0:
+        etapa_receive = "MISS"
+    elif dt_103 is not None and dt_216 is not None:
+        etapa_receive = "OK" if dt_216 <= deadline_dplus1(dt_103) else "MISS (atraso)"
+    else:
+        etapa_receive = "OK"
+
+    # ETAPA 3 - Stow success: 201 ate D+1 5:59 do 216
+    if n_216 == 0:
+        etapa_stow = "NA"
+    elif not has_201:
+        etapa_stow = "MISS"
+    elif dt_216 is not None and dt_201 is not None:
+        etapa_stow = "OK" if dt_201 <= deadline_dplus1(dt_216) else "MISS (atraso)"
+    else:
+        etapa_stow = "OK"
+
+    # ETAPA 4 - Depart success: 202 ate D+1 5:59 da data-ref do 201 (regra D-1/D0)
+    if not has_201:
+        etapa_depart = "NA"
+    elif not has_202:
+        etapa_depart = "MISS"
+    elif dt_201 is not None and dt_202 is not None:
+        ref201 = (dt_201.normalize() - pd.Timedelta(days=1)) if dt_201.hour < 6 else dt_201.normalize()
+        dl = ref201 + pd.Timedelta(days=1, hours=5, minutes=59, seconds=59)
+        etapa_depart = "OK" if dt_202 <= dl else "MISS (atraso)"
+    else:
+        etapa_depart = "OK"
+
+    # Backlog FM: 103 parado 3+ dias sem alcancar next mile (node OTHER_MILE)
+    reached_other = any(classify_node(n) == "OTHER_MILE" for n in nodes)
+    backlog_3d = bool(has_103 and not reached_other and dt_103 is not None
+                      and ultima_dt is not None and (ultima_dt - dt_103).days >= 3)
+
+    wrong_node_414 = "414" in codes
+
+    # ONDE FOI A PERDA/GAP (primeira falha no funil)
+    if not has_103:
+        onde_falhou = "COLETA (sem 103)"
+    elif etapa_receive.startswith("MISS"):
+        onde_falhou = "RECEIVE (216)"
+    elif etapa_stow.startswith("MISS"):
+        onde_falhou = "STOW (201)"
+    elif etapa_depart.startswith("MISS"):
+        onde_falhou = "DEPART (202)"
+    elif wrong_node_414:
+        onde_falhou = "WRONG NODE (414 mis-sort)"
+    elif has_238:
+        onde_falhou = "RE-SLAMM (238)"
+    elif has_301:
+        onde_falhou = "NENHUM (entregue OK)"
+    else:
+        onde_falhou = "EM ANDAMENTO"
+
+    # ---- CATEGORIA (prioridade: problemas especiais > funil > desfecho) ----
+    flags = []
     if danificado:
         categoria = "PACOTE DANIFICADO"
-        if dano_codes:
-            flags.append(f"eventos de dano: {','.join(dano_codes)}")
-        if has_301:
-            flags.append("entregue danificado (301)")
+    elif wrong_node_414:
+        categoria = "WRONG NODE (414)"
     elif has_238:
-        categoria = "RE-SLAMM"
+        categoria = "RE-SLAMM (238)"
+    elif not has_103:
+        categoria = "SEM COLETA (sem 103)"
+    elif etapa_receive.startswith("MISS"):
+        categoria = "GAP RECEIVE"
+    elif etapa_stow.startswith("MISS"):
+        categoria = "GAP STOW"
+    elif etapa_depart.startswith("MISS"):
+        categoria = "GAP DEPART"
+    elif has_301:
+        categoria = "ENTREGUE OK"
+    else:
+        categoria = "EM ANDAMENTO"
+
+    # ---- flags ----
+    if danificado:
+        flags.append(f"DANIFICADO ({','.join(dano_codes) if dano_codes else 'shiptrack=DAMAGE'})")
+    if backlog_3d:
+        flags.append("BACKLOG 3+ dias sem next mile")
+    if wrong_node_414:
+        flags.append("wrong node (414)")
+    if has_238:
+        flags.append("reslam (238)")
         if late_reinject:
             flags.append("FORCADO (reinjecao SPS pos-stow)")
-        if n_201 >= 5:
-            flags.append(f"stow repetido {n_201}x (manipulacao)")
-    elif has_103 and n_216 == 0 and not has_201 and not has_301 and n_cpt_miss >= 1:
-        categoria = "PACOTE PERDIDO / TRAVADO"
-        flags.append("coletado mas nunca recebido/estufado")
-    elif has_103 and n_216 == 0:
-        categoria = "GAP DE RECEBIMENTO (coletado sem 216)"
-        if has_104:
-            flags.append(f"cancelado/RTO (104 {reason_of('104')})")
-    elif not has_103 and n_216 == 0 and (has_201 or has_202):
-        categoria = "ORFAO (sem coleta e sem receive)"
-    elif n_216 >= 1 and has_104:
-        categoria = "RECEBIDO porem CANCELADO/RTO"
-        flags.append(f"104 reason {reason_of('104')}")
-    elif n_216 >= 1 and has_201 and has_202 and has_301:
-        categoria = "RECEBIDO - fluxo normal (entregue)"
-    elif n_216 >= 1 and has_201 and has_202:
-        categoria = "RECEBIDO - fluxo normal (em transito)"
-    elif n_216 >= 1 and has_201 and not has_202:
-        categoria = "RECEBIDO + stow, SEM despacho (202)"
-    elif n_216 >= 1:
-        categoria = "RECEBIDO - parcial (sem stow)"
-    else:
-        categoria = "INDEFINIDO (verificar eventos)"
-
-    # ---- flags adicionais ----
-    if danificado and "dano" not in "".join(flags):
-        flags.append(f"DANIFICADO ({','.join(dano_codes) if dano_codes else 'shiptrack=DAMAGE'})")
     if has_228:
         flags.append("cross-dock (XD)")
+    if has_104:
+        flags.append(f"cancelado/RTO (104 {reason_of('104')})")
     if n_cpt_miss >= 1:
         flags.append(f"CPT miss {n_cpt_miss}x (661)")
-    if excecao:
-        flags.append("evento de excecao/hold")
+    if ced_missed:
+        flags.append("CED Missed (259)")
     if has_301:
         flags.append("entregue (301)")
-    if ced_missed:
-        flags.append("CED Missed (259) - estourou prazo de entrega")
 
     rota = ">".join(dict.fromkeys(nodes)) if nodes else "-"
     origem = nodes[0] if nodes else ""
@@ -283,18 +361,31 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     linha = [f"{nome}: {marco(code)}" for nome, code in marcos_def if code in codes]
     linha_do_tempo = " | ".join(linha)
 
-    # diagnostico objetivo (1 linha curta)
-    flag_principal = flags[0] if flags else ""
-    diagnostico = f"{categoria} @ {local_simples} ({node_base})"
-    if flag_principal:
-        diagnostico += f" - {flag_principal}"
+    # ---- DIAGNOSTICO unificado (onde foi a perda + funil + aging) ----
+    aging_txt = f"{aging_dias}d" if aging_dias is not None else "?"
+    funil = (f"Pickup:{etapa_pickup} > Receive:{etapa_receive} > "
+             f"Stow:{etapa_stow} > Depart:{etapa_depart}")
+    flag_extra = ""
+    for f in flags:
+        if f.startswith(("DANIFICADO", "BACKLOG", "wrong", "reslam", "CED", "cancelado")):
+            flag_extra = f" | {f}"
+            break
+    diagnostico = (f"PERDA EM: {onde_falhou} | {funil} | {local_simples}"
+                   f" ({node_base}) | aging {aging_txt}{flag_extra}")
 
-    # analise curta
     analise = diagnostico
 
     return {
         "diagnostico": diagnostico,
+        "onde_falhou": onde_falhou,
         "categoria": categoria,
+        "aging_dias": aging_dias,
+        "etapa_pickup": etapa_pickup,
+        "etapa_receive": etapa_receive,
+        "etapa_stow": etapa_stow,
+        "etapa_depart": etapa_depart,
+        "backlog_3d": "SIM" if backlog_3d else "NAO",
+        "wrong_node_414": "SIM" if wrong_node_414 else "NAO",
         "local_simples": local_simples,
         "localizacao_atual": localizacao,
         "origem": origem,
@@ -350,19 +441,24 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
     resultado = pd.DataFrame(linhas)
 
+    aging_series = pd.to_numeric(resultado.get("aging_dias"), errors="coerce")
     resumo = {
         "total_tracking_ids": len(resultado),
         "por_categoria": resultado["categoria"].value_counts().to_dict(),
-        "gap_recebimento": int((resultado["categoria"].str.startswith("GAP")).sum()),
-        "reslamm": int((resultado["categoria"] == "RE-SLAMM").sum()),
-        "cancelados": int((resultado["categoria"].str.contains("CANCELADO")).sum()),
-        "perdidos": int((resultado["categoria"].str.contains("PERDIDO")).sum()),
-        "orfaos": int((resultado["categoria"].str.startswith("ORFAO")).sum()),
-        "ced_missed": int((resultado["ced_missed_259"] == "SIM").sum()),
+        "por_onde_falhou": resultado["onde_falhou"].value_counts().to_dict(),
+        "gap_receive": int((resultado["etapa_receive"].str.startswith("MISS")).sum()),
+        "gap_stow": int((resultado["etapa_stow"].str.startswith("MISS")).sum()),
+        "gap_depart": int((resultado["etapa_depart"].str.startswith("MISS")).sum()),
+        "sem_coleta": int((resultado["etapa_pickup"] == "SEM 103").sum()),
+        "wrong_node_414": int((resultado["wrong_node_414"] == "SIM").sum()),
+        "reslam_238": int((resultado["reslamm_238"] == "SIM").sum()),
+        "backlog_3d": int((resultado["backlog_3d"] == "SIM").sum()),
         "danificados": int((resultado["danificado"] == "SIM").sum()),
+        "ced_missed": int((resultado["ced_missed_259"] == "SIM").sum()),
         "parados_na_fm": int(resultado["localizacao_atual"].str.contains("MILHA DE FM").sum()),
         "outras_milhas": int(resultado["localizacao_atual"].str.contains("OTHER MILE").sum()),
         "entregues": int((resultado["entregue_301"] == "SIM").sum()),
+        "aging_medio_dias": round(float(aging_series.mean()), 1) if aging_series.notna().any() else None,
     }
 
     # tabela dinamica: Categoria (linhas) x Localizacao (colunas)

@@ -65,30 +65,34 @@ if uploaded is not None:
         st.stop()
 
     # ---- Metricas ----
-    st.subheader("Resumo")
+    st.subheader("Resumo do funil (Pickup > Receive > Stow > Depart)")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Tracking IDs", resumo["total_tracking_ids"])
-    c2.metric("Gap recebimento", resumo["gap_recebimento"])
-    c3.metric("Re-slamm", resumo["reslamm"])
-    c4.metric("Cancelados/RTO", resumo["cancelados"])
+    c2.metric("Gap RECEIVE", resumo["gap_receive"])
+    c3.metric("Gap STOW", resumo["gap_stow"])
+    c4.metric("Gap DEPART", resumo["gap_depart"])
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("Parados na FM", resumo["parados_na_fm"])
-    c6.metric("Other mile", resumo["outras_milhas"])
-    c7.metric("Danificados", resumo["danificados"])
-    c8.metric("Entregues", resumo["entregues"])
+    c5.metric("Sem coleta (103)", resumo["sem_coleta"])
+    c6.metric("Wrong node (414)", resumo["wrong_node_414"])
+    c7.metric("Re-slamm (238)", resumo["reslam_238"])
+    c8.metric("Backlog 3+ dias", resumo["backlog_3d"])
     c9, c10, c11, c12 = st.columns(4)
-    c9.metric("Perdidos", resumo["perdidos"])
-    c10.metric("CED Missed", resumo["ced_missed"])
+    c9.metric("Parados na FM", resumo["parados_na_fm"])
+    c10.metric("Danificados", resumo["danificados"])
+    c11.metric("CED Missed", resumo["ced_missed"])
+    c12.metric("Aging medio (dias)", resumo["aging_medio_dias"])
 
     # ---- Tabela dinamica ----
     st.subheader("Tabela dinamica")
     opcoes = {
-        "Categoria": "categoria", "Localizacao": "local_simples",
-        "Origem": "origem", "Destino (base)": "destino",
+        "Onde falhou": "onde_falhou", "Categoria": "categoria",
+        "Localizacao": "local_simples", "Origem": "origem",
+        "Destino (base)": "destino", "Etapa Receive": "etapa_receive",
+        "Etapa Stow": "etapa_stow", "Etapa Depart": "etapa_depart",
     }
     colf1, colf2 = st.columns(2)
     linha_sel = colf1.selectbox("Linhas", list(opcoes.keys()), index=0)
-    col_sel = colf2.selectbox("Colunas", list(opcoes.keys()), index=1)
+    col_sel = colf2.selectbox("Colunas", list(opcoes.keys()), index=2)
     pivot = build_pivot(resultado, opcoes[linha_sel], opcoes[col_sel])
     st.dataframe(pivot, use_container_width=True)
 
@@ -100,8 +104,9 @@ if uploaded is not None:
 
     # ---- Tabela objetiva (colunas principais primeiro) ----
     st.subheader("Analise por tracking ID")
-    cols_obj = ["tracking_id", "diagnostico", "categoria", "local_simples",
-                "origem", "destino", "linha_do_tempo"]
+    cols_obj = ["tracking_id", "onde_falhou", "categoria", "aging_dias",
+                "etapa_pickup", "etapa_receive", "etapa_stow", "etapa_depart",
+                "local_simples", "origem", "destino", "diagnostico", "linha_do_tempo"]
     cols_obj = [c for c in cols_obj if c in resultado.columns]
     modo = st.radio("Exibir", ["Objetivo", "Completo"], horizontal=True)
     tabela = resultado[cols_obj] if modo == "Objetivo" else resultado
