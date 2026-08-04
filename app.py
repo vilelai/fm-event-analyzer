@@ -12,7 +12,7 @@ import io
 import pandas as pd
 import streamlit as st
 
-from fm_analyzer import analyze_events, EVENT_CODES
+from fm_analyzer import analyze_events, build_pivot, EVENT_CODES
 
 st.set_page_config(page_title="FM Event Analyzer", page_icon="📦", layout="wide")
 
@@ -80,21 +80,39 @@ if uploaded is not None:
     c9.metric("Perdidos", resumo["perdidos"])
     c10.metric("Encerrados/baixa", resumo["encerrados_baixa"])
 
+    # ---- Tabela dinamica ----
+    st.subheader("Tabela dinamica")
+    opcoes = {
+        "Categoria": "categoria", "Localizacao": "local_simples",
+        "Origem": "origem", "Destino (base)": "destino",
+    }
+    colf1, colf2 = st.columns(2)
+    linha_sel = colf1.selectbox("Linhas", list(opcoes.keys()), index=0)
+    col_sel = colf2.selectbox("Colunas", list(opcoes.keys()), index=1)
+    pivot = build_pivot(resultado, opcoes[linha_sel], opcoes[col_sel])
+    st.dataframe(pivot, use_container_width=True)
+
     st.subheader("Distribuicao por categoria")
     cat = pd.DataFrame(
         [{"Categoria": k, "Qtd": v} for k, v in resumo["por_categoria"].items()]
     ).sort_values("Qtd", ascending=False)
     st.bar_chart(cat.set_index("Categoria"))
 
-    # ---- Tabela ----
+    # ---- Tabela objetiva (colunas principais primeiro) ----
     st.subheader("Analise por tracking ID")
-    st.dataframe(resultado, hide_index=True, use_container_width=True)
+    cols_obj = ["tracking_id", "diagnostico", "categoria", "local_simples",
+                "origem", "destino", "linha_do_tempo"]
+    cols_obj = [c for c in cols_obj if c in resultado.columns]
+    modo = st.radio("Exibir", ["Objetivo", "Completo"], horizontal=True)
+    tabela = resultado[cols_obj] if modo == "Objetivo" else resultado
+    st.dataframe(tabela, hide_index=True, use_container_width=True)
 
     # ---- Download ----
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         resultado.to_excel(writer, index=False, sheet_name="Analise")
         cat.to_excel(writer, index=False, sheet_name="Resumo")
+        pivot.to_excel(writer, sheet_name="TabelaDinamica")
     st.download_button(
         "⬇️ Baixar analise (Excel)",
         data=buffer.getvalue(),

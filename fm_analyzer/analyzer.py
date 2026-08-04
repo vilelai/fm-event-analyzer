@@ -270,6 +270,20 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     if n_cpt_miss >= 1 and not has_301:
         localizacao += f" | ATRASADO ({n_cpt_miss}x CPT miss)"
 
+    # localizacao simplificada (para tabela dinamica)
+    if "MILHA DE FM" in localizacao:
+        local_simples = "PARADO NA FM"
+    elif "OTHER MILE" in localizacao:
+        local_simples = "OTHER MILE"
+    elif "ENTREGUE" in localizacao:
+        local_simples = "ENTREGUE"
+    elif "ROTA DE ENTREGA" in localizacao:
+        local_simples = "EM ROTA (last mile)"
+    elif "BAIXA" in localizacao:
+        local_simples = "BAIXA/ENCERRADO"
+    else:
+        local_simples = "OUTRO"
+
     # ---- linha do tempo legivel (so os marcos que existem) ----
     marcos_def = [
         ("Label(503)", "503"), ("Coleta(103)", "103"), ("Receive(216)", "216"),
@@ -283,13 +297,19 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     linha = [f"{nome}: {marco(code)}" for nome, code in marcos_def if code in codes]
     linha_do_tempo = " | ".join(linha)
 
-    analise = f"{categoria} | LOCAL: {localizacao}"
-    if flags:
-        analise += " | " + "; ".join(flags)
-    analise += f" || Rota: {rota}"
+    # diagnostico objetivo (1 linha curta)
+    flag_principal = flags[0] if flags else ""
+    diagnostico = f"{categoria} @ {local_simples} ({node_base})"
+    if flag_principal:
+        diagnostico += f" - {flag_principal}"
+
+    # analise curta
+    analise = diagnostico
 
     return {
+        "diagnostico": diagnostico,
         "categoria": categoria,
+        "local_simples": local_simples,
         "localizacao_atual": localizacao,
         "origem": origem,
         "destino": destino,
@@ -358,4 +378,20 @@ def analyze_events(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "outras_milhas": int(resultado["localizacao_atual"].str.contains("OTHER MILE").sum()),
         "entregues": int((resultado["entregue_301"] == "SIM").sum()),
     }
+
+    # tabela dinamica: Categoria (linhas) x Localizacao (colunas)
+    try:
+        pivot = pd.crosstab(
+            resultado["categoria"], resultado["local_simples"],
+            margins=True, margins_name="Total",
+        )
+        resumo["pivot_categoria_local"] = pivot
+    except Exception:  # noqa: BLE001
+        resumo["pivot_categoria_local"] = None
+
     return resultado, resumo
+
+
+def build_pivot(resultado: pd.DataFrame, linhas: str = "categoria", colunas: str = "local_simples") -> pd.DataFrame:
+    """Gera uma tabela dinamica (contagem) com quaisquer duas colunas do resultado."""
+    return pd.crosstab(resultado[linhas], resultado[colunas], margins=True, margins_name="Total")
