@@ -380,8 +380,13 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
 
     if danificado:
         dano_txt = ",".join(dano_codes) if dano_codes else "DAMAGE"
-        conclusao = f"Pacote DANIFICADO (evento {dano_txt}) em {node_base}.{aging_info}"
-        tratativa = "Encaminhar para Problem Solve. Avaliar descarte ou devolucao conforme politica de dano."
+        if "423" in dano_codes:
+            conclusao = (f"ERRO: pacote marcado como danificado na reimpressao (PRISM/423) em {node_base}. "
+                         f"Evento indevido - o pacote NAO pode mais seguir o fluxo completo.{aging_info}")
+            tratativa = "Encaminhar para o processo de RTO (retorno). Nao ha como redirecionar ao fluxo completo apos o 423."
+        else:
+            conclusao = f"Pacote DANIFICADO (evento {dano_txt}) em {node_base}.{aging_info}"
+            tratativa = "Encaminhar para Problem Solve. Avaliar descarte ou devolucao conforme politica de dano."
     elif wrong_node_414:
         conclusao = f"MIS-SORT: a transportadora enviou o pacote para o node ERRADO ({node_base}).{aging_info}"
         tratativa = f"Acionar a transportadora para redirecionar do node {node_base} ao node correto de destino."
