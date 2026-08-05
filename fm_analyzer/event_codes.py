@@ -30,7 +30,7 @@ EVENT_CODES = {
     "407": {"nome": "DAMAGE - destinatario recusou (dano)", "desc": "Recipient refused to accept: pacote danificado. Movimentacao interna na rede da transportadora.", "confirmed": True},
     "408": {"nome": "DAMAGE - undeliverable, retorno (dano)", "desc": "Undeliverable, retornando para Amazon/MFN seller porque esta danificado.", "confirmed": True},
     "416": {"nome": "DAMAGE - undeliverable, destruicao (dano)", "desc": "Undeliverable e sera destruido porque esta danificado.", "confirmed": True},
-    "423": {"nome": "DAMAGE - pacote danificado", "desc": "Shipment is damaged. Movimentacao interna na rede da transportadora. Costuma preceder baixa (259).", "confirmed": True},
+    "423": {"nome": "DAMAGE - danificado na reimpressao (PRISM)", "desc": "Pacote marcado como DANIFICADO no processo de reimpressao da etiqueta no PRISM. Costuma preceder CED miss (259).", "confirmed": True},
     "432": {"nome": "DAMAGE - retido pelo carrier (dano)", "desc": "Shipment held by carrier porque esta danificado.", "confirmed": True},
     "485": {"nome": "DAMAGE - recusado na coleta (dano)", "desc": "Refused by pickup location porque o pacote esta danificado.", "confirmed": True},
     "503": {"nome": "Label Created", "desc": "Etiqueta/pedido criado. Primeiro evento do ciclo.", "confirmed": True},
