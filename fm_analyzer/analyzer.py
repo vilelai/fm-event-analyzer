@@ -113,12 +113,15 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
 
     # ---- presenca dos eventos padrao FM ----
     has_103 = has("103")
-    has_216 = has("216")
+    n_216 = codes.count("216")          # 1x = incompleto (so app do motorista); 2x = completo (associado bipou)
+    receive_completo = n_216 >= 2
+    receive_incompleto = n_216 == 1
     has_201 = has("201")
     has_202 = has("202")
     has_301 = has("301")  # entregue
     has_302 = has("302")  # em rota
-    eventos_completos = has_103 and has_216 and has_201 and has_202
+    # fluxo completo exige recebimento COMPLETO (2x 216)
+    eventos_completos = has_103 and receive_completo and has_201 and has_202
 
     # ---- evento paralisador (interrompe o fluxo) ----
     dano_codes = sorted(codes_set & DAMAGE_STRONG)
@@ -157,8 +160,10 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     # ---- ate onde chegou no funil FM ----
     if not has_103:
         etapa = "sem_coleta"
-    elif not has_216:
+    elif n_216 == 0:
         etapa = "sem_receive"
+    elif receive_incompleto:
+        etapa = "receive_incompleto"
     elif not has_201:
         etapa = "sem_stow"
     elif not has_202:
@@ -174,6 +179,9 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
         base = "Pacote NAO foi coletado pelo DA (sem evento 103)."
     elif etapa == "sem_receive":
         base = "Pacote coletado pelo DA, mas NAO foi recebido na base (sem 216)."
+    elif etapa == "receive_incompleto":
+        base = ("Pacote coletado com RECEBIMENTO INCOMPLETO: apenas o motorista finalizou no app (1x 216); "
+                "o associado NAO bipou o pacote (falta o 2o 216).")
     elif etapa == "sem_stow":
         base = "Pacote coletado e recebido na base, mas a base NAO processou/estufou o pacote (sem 201)."
     elif etapa == "sem_depart":
@@ -205,10 +213,18 @@ def analyze_single_tracking(g: pd.DataFrame, cols: dict) -> dict:
     else:
         conclusao = base
 
+    if n_216 == 0:
+        recebimento = "Sem receive"
+    elif receive_incompleto:
+        recebimento = "Incompleto (1x 216)"
+    else:
+        recebimento = "Completo (2x 216)"
+
     return {
         "eventos_completos_fm": "Sim" if eventos_completos else "Nao",
         "ultima_movimentacao": ultima_mov,
         "conclusao": conclusao,
+        "recebimento_216": recebimento,
         "evento_paralisador": paralisador,
         "sequencia_eventos": "-".join(codes),
     }
